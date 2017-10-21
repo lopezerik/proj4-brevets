@@ -5,7 +5,7 @@ Replacement for RUSA ACP brevet time calculator
 """
 
 import flask
-from flask import request
+from flask import request, flash
 import arrow  # Replacement for datetime, based on moment.js
 import acp_times  # Brevet time calculations
 import config
@@ -52,16 +52,33 @@ def _calc_times():
     Expects one URL-encoded argument, the number of miles.
     """
     app.logger.debug("Got a JSON request")
-    km = request.args.get('km', 999, type=float)
+
+    km = request.args.get('km', 9999, type=float)
+    if(km == 9999):
+        result = {"open": "", "close": ""}
+        return flask.jsonify(result=result)
+
+    brevet = request.args.get('brev', 200, type=int)
+    start_date = request.args.get('dat', '1970-01-01 00:00', type=str)
+    arr_date = arrow.get(start_date, 'YYYY-MM-DD HH:mm').isoformat()
+
     app.logger.debug("km={}".format(km))
+    app.logger.debug("brevet={}".format(brevet))
+    app.logger.debug("start_date={}".format(start_date))
+    app.logger.debug("arr_date={}".format(arr_date))
     app.logger.debug("request.args: {}".format(request.args))
-    # FIXME: These probably aren't the right open and close times
-    # and brevets may be longer than 200km
-    open_time = acp_times.open_time(km, 200, arrow.now().isoformat)
-    close_time = acp_times.close_time(km, 200, arrow.now().isoformat)
+    open_time = acp_times.open_time(km, brevet, arr_date)
+    close_time = acp_times.close_time(km, brevet, arr_date)
     result = {"open": open_time, "close": close_time}
     return flask.jsonify(result=result)
 
+@app.route("/_shift_one")
+def _shift_one():
+    day = request.args.get('day')
+    arr_date = arrow.get(day)
+    arr_date = arr_date.shift(hours=1).isoformat()
+    result = {"close": arr_date}
+    return flask.jsonify(result=result)
 
 #############
 

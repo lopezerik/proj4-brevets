@@ -15,6 +15,25 @@ import arrow
 #  javadoc comments.
 #
 
+OPEN = [(200, 34), (200, 32), (200, 30), (400, 28), (300, 26)]
+CLOSE = [(200, 15), (200, 15), (200, 15), (400, 11.428), (300, 13.333)]
+DEFAULT = {200: 13.5, 300: 20, 400: 27, 600: 40, 1000: 75}
+
+
+def round_num(raw):
+    '''
+    Args:
+      raw: floating point value of distance / time
+    Returns:
+       rounds up or down the minutes from raw and returns as float
+    '''
+    # raw - decimal value
+    hour = int(raw)
+    # minutes rounded up
+    minutes = ((raw - hour) * 60)
+    minutes = (round(minutes) / 60)
+    return (hour + minutes)
+
 
 def open_time(control_dist_km, brevet_dist_km, brevet_start_time):
     """
@@ -29,7 +48,22 @@ def open_time(control_dist_km, brevet_dist_km, brevet_start_time):
        An ISO 8601 format date string indicating the control open time.
        This will be in the same time zone as the brevet start time.
     """
-    return arrow.now().isoformat()
+    time = 0
+    dist = control_dist_km
+    arr_date = arrow.get(brevet_start_time)
+    if(dist > brevet_dist_km):
+        dist = brevet_dist_km
+    for distance, speed in OPEN:
+        if(dist > 0):
+            if(dist > distance):
+                raw = (distance / speed)
+                time += round_num(raw)
+                dist -= distance
+            else:
+                raw = (dist / speed)
+                time += round_num(raw)
+                dist -= distance
+    return arr_date.shift(hours=time).isoformat()
 
 
 def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
@@ -45,4 +79,22 @@ def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
        An ISO 8601 format date string indicating the control close time.
        This will be in the same time zone as the brevet start time.
     """
+    time = 0
+    dist = control_dist_km
+    arr_date = arrow.get(brevet_start_time)
+    if(dist >= brevet_dist_km):
+        time = DEFAULT[brevet_dist_km]
+    else:
+        for distance, speed in CLOSE:
+            if(dist > 0):
+                if(dist > distance):
+                    raw = (distance / speed)
+                    time += round_num(raw)
+                    dist -= distance
+                else:
+                    raw = (dist / speed)
+                    time += round_num(raw)
+                    dist -= distance
+    return arr_date.shift(hours=time).isoformat()
+
     return arrow.now().isoformat()

@@ -34,11 +34,11 @@
   <p>This worksheet is for ACP-sanctioned brevets between 200 and 1000 kilometers</p>
 
   <!--
-  -- If there are any warnings or other messages from a prior
-  -- request to the server, 
-  -- they appear above the rest of the content, just until the next 
-  -- action.  (This is only on request/response transactions that
-  -- result in regenerating the page, not on every xmlhttp request.) 
+  - If there are any warnings or other messages from a prior
+  - request to the server, 
+  - they appear above the rest of the content, just until the next 
+  - action.  (This is only on request/response transactions that
+  - result in regenerating the page, not on every xmlhttp request.) 
   -->
 
 {% with messages = get_flashed_messages() %}
@@ -63,7 +63,7 @@
     <option value="600">600km</option>
     <option value="1000">1000km</option>
   </select>
-  </div> <!-- columns 1--4  -->
+  </div> <!-- columns 1 to 4-->
   <div class="col-md-6">
     <label>Begins at</label>
     <input type=date name="begin_date" id="begin_date" value="2017-01-01" />
@@ -71,7 +71,7 @@
   </div> <!-- columns 5-10 -->
   </div> <!-- row -->
 
-  <br />  <!-- Cosmetic -- a little vertical space -->
+  <br />  <!-- Cosmetic -- -- a little vertical space -->
   <!-- Although we do not use tables for general page layout, they are
        appropriate for something that really is a table, like this
        one.  We allocate it the full 12 columns of the bootstrap grid.
@@ -87,6 +87,24 @@
 	<th>Close</th>
 	<th>Notes</th>
       </tr>
+    <tr class="start">
+      <!-- Dist (mi) -->
+      <td><input name="start_miles" type="text" 
+           min="0" max="900" size="5" value="0(Start)" disabled /></td>
+      <!-- Dist (km) -->
+      <td><input name="start_km" type="text"
+	   min="0" max="1100" size="5" value="0(Start)" disabled /> </td>
+      <!-- Location (optional) -->
+      <td><input name="location" type="text" 
+        placeholder="Optional location name"
+	size="20" /> </td>
+      <!-- Open time (read only, set by JavaScript function -->
+      <td><input name="start_open" type="datetime" value="" readonly /></td>
+      <!-- Close time (read only, set by JavaScript function -->
+      <td><input name="start_close" type="datetime" value="" readonly /></td>
+      <!-- Notes (error messages for this row) -->
+      <td class="notes"> &nbsp; </td>
+    </tr>
    {% for row in range(20) %}
     <tr class="control">
       <!-- Dist (mi) -->
@@ -104,7 +122,7 @@
       <!-- Close time (read only, set by JavaScript function -->
       <td><input name="close" type="datetime" value="" readonly /></td>
       <!-- Notes (error messages for this row) -->
-      <td class="notes"> &nbsp; </td>
+      <td class="notes" id="error_notes"> &nbsp; </td>
     </tr>
     {% endfor %}
   </table>
@@ -121,49 +139,117 @@
   // It extracts the distance and calls the server to get times to
   // fill in open and close times in a human-readable format.
   // (If we want to also keep the ISO-formatted times, we'll need to
-  // stash them in hidden fields.) 
+  // stash them in hidden fields.)
   function calc_times(control) {
     var km = control.find("input[name='km']").val();
+    var brevet_dist = parseInt($("select[name='distance']").val());
     var open_time_field = control.find("input[name='open']");
     var close_time_field = control.find("input[name='close']");
-    
-    $.getJSON(TIME_CALC_URL, { km: km }, 
+    var sd = moment($('input[name="begin_date"]').val()).format("YYYY-MM-DD ");
+    var st = $('input[name="begin_time"]').val();
+    var date_and_time = sd + st;
+    $.getJSON(TIME_CALC_URL, { km: km, dat: date_and_time, brev: brevet_dist },
       // response handler
       function(data) {
          var times = data.result;
          console.log("Got a response: " +  times);
          console.log("Response.open = " + times.open);
-         open_time_field.val( moment(times.open).format("ddd M/D H:mm"));
-         close_time_field.val( moment(times.close).format("ddd M/D H:mm"));
+         if(times.open == "" && times.close == ""){
+             open_time_field.val("");
+             close_time_field.val("");
+         } else{
+             open_time_field.val( moment(times.open).utc().format("ddd M/D H:mm"));
+             close_time_field.val( moment(times.close).utc().format("ddd M/D H:mm"));
+         }
        } // end of handler function
      );// End of getJSON
     }
+    
+    // Sets the close time for the default, 0, close field
+    function shift_one() {
+      var sd = moment($('input[name="begin_date"]').val()).format("YYYY-MM-DD ");
+      var st = $('input[name="begin_time"]').val();
+      var date_and_time = sd + st;
+      $.getJSON("/_shift_one", {day: date_and_time},
+        //response
+        function(data){
+          var time = data.result;
+          $('input[name="start_close"]').val( moment(time.close).utc().format("ddd M/D H:mm"));
+        }
+      );
+    }
+                
 
   $(document).ready(function(){
    // Do the following when the page is finished loading
+      var day = moment($('input[name="begin_date"]').val()).format("ddd M/D ");
+      var time = $('input[name="begin_time"]').val();
+
+      $('input[name="start_open"]').val(day + time);
+      shift_one();
+      $('input[name="begin_date"]').change(
+          function(){
+              var day = moment($(this).val()).format("ddd M/D ");
+              var time = $('input[name="begin_time"]').val();
+
+              $('input[name="start_open"]').val(day + time);
+              shift_one();
+          });
+
+      $('input[name="begin_time"]').change(
+          function(){
+              var time = $(this).val();
+              var day = moment($('input[name="begin_date"]').val()).format("ddd M/D ");
+
+              $('input[name="start_open"]').val(day + time);
+              shift_one();
+          });
 
       $('input[name="miles"]').change(
          function() {
+             document.getElementById("error_notes").innerHTML = "";
              var miles = parseFloat($(this).val());
              var km = (1.609344 * miles).toFixed(1) ;
              console.log("Converted " + miles + " miles to " + km + " kilometers");
+
+             var brevet_dist = parseInt($("select[name='distance']").val());
+             var brev_plus_ten = brevet_dist + (brevet_dist * 0.10);
              var control_entry = $(this).parents(".control")
              var target = control_entry.find("input[name='km']");
+             var error = "Error: controle point, " + km + "km, over 10% longer than " + brevet_dist + "km brevet";
              target.val( km );
-             // Then calculate times for this entry
-             calc_times(control_entry);
+             // If valid distance, calculate times
+             if(km > brev_plus_ten){
+                 document.getElementById("error_notes").innerHTML = error;
+                 control_entry.find('input[name="open"]').val("Error: controle out of range");
+                 control_entry.find('input[name="close"]').val("Error: controle out of range");
+             } else{
+                 calc_times(control_entry);
+             }
           });
 
       $('input[name="km"]').change(
          function() {
+             document.getElementById("error_notes").innerHTML = "";
              var km = parseFloat($(this).val());
              var miles = (0.621371 * km).toFixed(1) ;
              console.log("Converted " + km + " km to " + miles + " miles");
+
+             var brevet_dist = parseInt($("select[name='distance']").val());
+             var brev_plus_ten = brevet_dist + (brevet_dist * 0.10);
              var control_entry = $(this).parents(".control")
              var target = control_entry.find("input[name='miles']");
+             var error = "Error: controle point, " + km + "km, over 10% longer than " + brevet_dist + "km brevet";
              target.val( miles );
-             // Then calculate times for this entry
-             calc_times(control_entry);
+             // If valid distance, calculate times
+             if(km > brev_plus_ten){
+                 document.getElementById("error_notes").innerHTML = error;
+                 control_entry.find('input[name="open"]').val("Error: controle out of range");
+                 control_entry.find('input[name="close"]').val("Error: controle out of range");
+
+             } else{
+                 calc_times(control_entry);
+             }
           });
 
      });   // end of what we do on document ready
