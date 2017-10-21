@@ -96,3 +96,4 @@ def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
                     time += round_num(raw)
                     dist -= distance
     return arr_date.shift(hours=time).isoformat()
+
